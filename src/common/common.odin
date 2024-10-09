@@ -3,17 +3,33 @@ package common
 import "core:mem"
 import "core:strings"
 
+import "src:term"
+
 UserID :: u32
 
 User :: struct #packed
 {
   id: UserID,
+  color: ColorKind,
   name: string,
+}
+
+@(private)
+struct_asserts :: proc(user: User, msg: Message)
+{
+  #assert(size_of(User) == 
+          size_of(user.id) + 
+          size_of(user.name) +
+          size_of(user.color))
+
+  #assert(size_of(Message) == 
+          size_of(msg.sender) + 
+          size_of(msg.data))
 }
 
 bytes_from_user :: proc(user: User, arena: mem.Allocator) -> []byte
 {
-  result := make([]byte, size_of(user.id) + len(user.name), arena)
+  result := make([]byte, 128, arena)
   result_pos: int
 
   id_bytes := transmute([size_of(user.id)]byte) user.id
@@ -22,6 +38,9 @@ bytes_from_user :: proc(user: User, arena: mem.Allocator) -> []byte
     result[result_pos] = b
     result_pos += 1
   }
+
+  result[result_pos] = cast(byte) user.color
+  result_pos += 1
 
   for b in user.name
   {
@@ -36,7 +55,8 @@ user_from_bytes :: proc(bytes: []byte, arena: mem.Allocator) -> User
 {
   result: User
   result.id = u32_from_bytes(bytes[:4])
-  result.name = string_from_bytes(bytes[4:], arena)
+  result.color= cast(ColorKind) u8_from_bytes(bytes[4:5])
+  result.name = string_from_bytes(bytes[5:], arena)
 
   return result
 }
@@ -77,6 +97,21 @@ message_from_bytes :: proc(bytes: []byte, arena: mem.Allocator) -> Message
   return result
 }
 
+u8_from_bytes :: proc(bytes: []byte) -> u8
+{
+  result: u8
+  
+  size := size_of(u8)
+  assert(len(bytes) == size)
+
+  for i in 0..<size
+  {
+    result |= u8(bytes[i]) << (uint(size-i-1) * 8)
+  }
+
+  return result
+}
+
 u32_from_bytes :: proc(bytes: []byte) -> u32
 {
   result: u32
@@ -95,4 +130,29 @@ u32_from_bytes :: proc(bytes: []byte) -> u32
 string_from_bytes :: proc(bytes: []byte, arena: mem.Allocator) -> string
 {
   return strings.clone_from_bytes(bytes, arena)
+}
+
+ColorKind :: enum u8
+{
+  BLUE,
+  GREEN,
+  ORANGE,
+  PURPLE,
+  YELLOW,
+}
+
+color_to_term_color :: proc(color: ColorKind) -> term.ColorKind
+{
+  result: term.ColorKind
+
+  switch color
+  {
+  case .BLUE:   result = .BLUE
+  case .GREEN:  result = .GREEN
+  case .ORANGE: result = .ORANGE
+  case .PURPLE: result = .PURPLE
+  case .YELLOW: result = .YELLOW
+  }
+
+  return result
 }

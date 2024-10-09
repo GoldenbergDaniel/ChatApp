@@ -12,6 +12,7 @@ ColorKind :: enum
   GRAY,
   GREEN,
   ORANGE,
+  PURPLE,
   RED,
   WHITE,
   YELLOW,
@@ -45,6 +46,7 @@ color :: proc(kind: ColorKind)
   case .GRAY:   fmt.print("\u001b[38;5;7m")
   case .GREEN:  fmt.print("\u001b[38;5;2m")
   case .ORANGE: fmt.print("\u001b[38;5;166m")
+  case .PURPLE: fmt.print("\u001b[38;5;35m")
   case .RED:    fmt.print("\u001b[38;5;1m")
   case .WHITE:  fmt.print("\u001b[38;5;15m")
   case .YELLOW: fmt.print("\u001b[93m")

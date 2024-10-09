@@ -3,9 +3,10 @@ package server
 import "core:fmt"
 import "core:net"
 import "core:time"
+import "core:math/rand"
 
 import "src:common"
-// import "src:term"
+import "src:term"
 
 MAX_CONNECTIONS  :: 2
 RECV_TIMEOUT_DUR :: time.Millisecond * 100
@@ -48,11 +49,17 @@ main :: proc()
       net.set_option(clients[client_count].socket, .Receive_Timeout, RECV_TIMEOUT_DUR)
 
       user := common.user_from_bytes(user_bytes[:bytes_read], context.allocator)
+      user.color = rand.choice_enum(common.ColorKind)
       clients[client_count].user = user
 
       client_count += 1
 
-      fmt.printf("%s has entered the chat. %i/%i\n", 
+      fmt.println(user_bytes)
+
+      term.color(common.color_to_term_color(user.color))
+      fmt.print(user.name)
+      term.color(.WHITE)
+      fmt.printf(" has entered the chat. %i/%i\n", 
                   user.name, 
                   client_count, 
                   MAX_CONNECTIONS)
@@ -91,23 +98,27 @@ main :: proc()
         is_running = false
         break
       }
-      
-      fmt.printf("%s: %s\n", name_from_user_id(message.sender), message.data)
+
+      sender := user_from_user_id(message.sender)
+      term.color(common.color_to_term_color(sender.color))
+      fmt.print(sender.name)
+      term.color(.WHITE)
+      fmt.printf(": %s\n", message.data)
     }
   }
 
   fmt.println("Server closed.")
 }
 
-name_from_user_id :: proc(id: common.UserID) -> string
+user_from_user_id :: proc(id: common.UserID) -> common.User
 {
-  result: string
+  result: common.User
 
   for client in clients
   {
     if client.user.id == id
     {
-      result = client.user.name 
+      result = client.user 
       break
     }
   }
