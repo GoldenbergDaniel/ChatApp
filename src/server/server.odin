@@ -54,15 +54,10 @@ main :: proc()
 
       client_count += 1
 
-      fmt.println(user_bytes)
-
       term.color(common.color_to_term_color(user.color))
       fmt.print(user.name)
       term.color(.WHITE)
-      fmt.printf(" has entered the chat. %i/%i\n", 
-                  user.name, 
-                  client_count, 
-                  MAX_CONNECTIONS)
+      fmt.printf(" has entered the chat. %i/%i\n", client_count, MAX_CONNECTIONS)
     }
 
     if client_count == MAX_CONNECTIONS do break
