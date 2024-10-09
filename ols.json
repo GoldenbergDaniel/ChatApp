@@ -1,0 +1,25 @@
+{
+  "": "https://raw.githubusercontent.com/DanielGavin/ols/master/misc/ols.schema.json",
+  "collections": [
+    {
+      "name": "src",
+      "path": "src"
+    }
+  ],
+  "enable_document_symbols": true,
+  "enable_semantic_tokens": true,
+  "enable_format": false,
+  "enable_hover": true,
+  "enable_snippets": true,
+  "verbose": true,
+  "checker_args": "-vet",
+  "profile": "main",
+  "profiles": [
+    {
+      "name": "main", 
+      "checker_path": [
+        "src/server", "src/client", "src/common", "src/term"
+      ]
+    }
+  ]
+}
