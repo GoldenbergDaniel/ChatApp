@@ -17,8 +17,13 @@ Client :: struct
   user: common.User,
 }
 
-clients: [MAX_CONNECTIONS]Client
-client_count: int
+ClientStore :: struct
+{
+  data: [MAX_CONNECTIONS]Client,
+  count: int,
+}
+
+clients: ClientStore
 
 main :: proc()
 {
@@ -38,34 +43,32 @@ main :: proc()
   
   for true
   {
-    client_soc, _, _ := net.accept_tcp(socket)
-    if client_count < MAX_CONNECTIONS
+    client_socket, _, _ := net.accept_tcp(socket)
+    if clients.count < MAX_CONNECTIONS
     {
       user_bytes: [128]byte
-      bytes_read, recv_err := net.recv_tcp(client_soc, user_bytes[:])
+      bytes_read, recv_err := net.recv_tcp(client_socket, user_bytes[:])
       if recv_err != nil || bytes_read == 0 do break
 
-      clients[client_count].socket = client_soc
-      net.set_option(clients[client_count].socket, .Receive_Timeout, RECV_TIMEOUT_DUR)
+      net.set_option(client_socket, .Receive_Timeout, RECV_TIMEOUT_DUR)
 
       user := common.user_from_bytes(user_bytes[:bytes_read], context.allocator)
       user.color = rand.choice_enum(common.ColorKind)
-      clients[client_count].user = user
 
-      client_count += 1
+      push_client(Client{client_socket, user})
 
       term.color(common.color_to_term_color(user.color))
       fmt.print(user.name)
       term.color(.WHITE)
-      fmt.printf(" has entered the chat. %i/%i\n", client_count, MAX_CONNECTIONS)
+      fmt.printf(" has entered the chat. %i/%i\n", clients.count, MAX_CONNECTIONS)
     }
 
-    if client_count == MAX_CONNECTIONS do break
+    if clients.count == MAX_CONNECTIONS do break
   }
   
   for is_running := true; is_running;
   {
-    for client in clients[:client_count]
+    for client in clients.data[:clients.count]
     {
       message_bytes: [128]byte
       bytes_read, recv_err := net.recv_tcp(client.socket, message_bytes[:])
@@ -105,11 +108,17 @@ main :: proc()
   fmt.println("Server closed.")
 }
 
+push_client :: proc(client: Client)
+{
+  clients.data[clients.count].user = client.user
+  clients.count += 1
+}
+
 user_from_user_id :: proc(id: common.UserID) -> common.User
 {
   result: common.User
 
-  for client in clients
+  for client in clients.data
   {
     if client.user.id == id
     {
