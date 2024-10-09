@@ -41,6 +41,7 @@ main :: proc()
     {
       if !client_is_valid(client) do continue
       
+      // Listen for message ----------------
       message_bytes: [common.MAX_MESSAGE_SIZE]byte
       bytes_read, recv_err := net.recv_tcp(client.socket, message_bytes[:])
       if recv_err != nil
@@ -57,20 +58,21 @@ main :: proc()
         }
       }
       
-      // Client disconnected
+      // Client disconnected ----------------
       if bytes_read == 0
       {
         term.color(.GRAY)
-        fmt.printf("%s has entered the chat. (%i/%i)\n", 
+        fmt.printf("%s has left the chat. (%i/%i)\n", 
                     client.user.name,
                     clients.count-1, 
                     MAX_CLIENT_CONNECTIONS)
         term.color(.WHITE)
 
-        pop_client(get_client(client.user.id))
+        pop_client(get_client_by_id(client.user.id))
         continue
       }
-      
+
+      // Handle message ----------------
       message := common.message_from_bytes(message_bytes[:bytes_read], context.allocator)
       if message.data == "q!"
       {
@@ -79,13 +81,15 @@ main :: proc()
       }
       else
       {
-        sender := get_client(message.sender).user
+        sender := get_client_by_id(message.sender).user
         term.color(common.color_to_term_color(sender.color))
         fmt.print(sender.name)
         term.color(.WHITE)
         fmt.printf(": %s\n", message.data)
       }
     }
+
+    // time.sleep(time.Millisecond * 100)
   }
 
   thread.join(connection_thread)
@@ -119,6 +123,8 @@ connection_thread_proc :: proc(this: ^thread.Thread)
                   MAX_CLIENT_CONNECTIONS)
       term.color(.WHITE)
     }
+
+    // time.sleep(time.Millisecond * 100)
   }
 }
 
@@ -166,12 +172,6 @@ pop_client :: proc(client: ^Client)
   }
 }
 
-get_client :: proc
-{
-  get_client_by_id,
-  get_client_at_idx,
-}
-
 get_client_by_id :: proc(id: common.UserID) -> ^Client
 {
   result: ^Client
@@ -183,18 +183,6 @@ get_client_by_id :: proc(id: common.UserID) -> ^Client
       result = &client
       break
     }
-  }
-
-  return result
-}
-
-get_client_at_idx :: proc(idx: int) -> ^Client
-{
-  result: ^Client
-
-  if client_is_valid(clients.data[idx])
-  {
-    result = &clients.data[idx]
   }
 
   return result

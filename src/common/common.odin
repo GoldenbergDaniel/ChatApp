@@ -19,19 +19,6 @@ User :: struct #packed
 
 MAX_USER_SIZE    :: 128
 
-@(private)
-struct_asserts :: proc(user: User, msg: Message)
-{
-  #assert(size_of(User) == 
-            size_of(user.id) + 
-            size_of(user.name) + 
-            size_of(user.color))
-
-  #assert(size_of(Message) == 
-            size_of(msg.sender) + 
-            size_of(msg.data))
-}
-
 bytes_from_user :: proc(user: User, arena: mem.Allocator) -> []byte
 {
   result := make([]byte, MAX_USER_SIZE, arena)
@@ -111,6 +98,19 @@ message_from_bytes :: proc(bytes: []byte, arena: mem.Allocator) -> Message
 
 // Util //////////////////////////////////////////////////////////////////////////////////
 
+
+@(private)
+struct_asserts :: proc(user: User, msg: Message)
+{
+  #assert(size_of(User) == 
+            size_of(user.id) + 
+            size_of(user.name) + 
+            size_of(user.color))
+
+  #assert(size_of(Message) == 
+            size_of(msg.sender) + 
+            size_of(msg.data))
+}
 
 u8_from_bytes :: proc(bytes: []byte) -> u8
 {

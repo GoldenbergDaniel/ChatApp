@@ -13,6 +13,7 @@ endpoint_str: string = "127.0.0.1:3030"
 
 main :: proc()
 {
+  // Prompt user's name ----------------
   fmt.print("Display name: ")
   name_buf: [128]byte
   name_len, read_name_err := os.read(os.stdin, name_buf[:])
@@ -27,6 +28,7 @@ main :: proc()
 
   fmt.println("Client started.")
 
+  // Connect to server ----------------
   for true
   {
     defer free_all(context.temp_allocator)
@@ -53,6 +55,7 @@ main :: proc()
     }
   }
 
+  // Send messages ----------------
   for true
   {
     fmt.print("> ")
