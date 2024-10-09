@@ -5,6 +5,9 @@ import "core:strings"
 
 import "src:term"
 
+// User //////////////////////////////////////////////////////////////////////////////////
+
+
 UserID :: u32
 
 User :: struct #packed
@@ -14,22 +17,24 @@ User :: struct #packed
   name: string,
 }
 
+MAX_USER_SIZE    :: 128
+
 @(private)
 struct_asserts :: proc(user: User, msg: Message)
 {
   #assert(size_of(User) == 
-          size_of(user.id) + 
-          size_of(user.name) +
-          size_of(user.color))
+            size_of(user.id) + 
+            size_of(user.name) + 
+            size_of(user.color))
 
   #assert(size_of(Message) == 
-          size_of(msg.sender) + 
-          size_of(msg.data))
+            size_of(msg.sender) + 
+            size_of(msg.data))
 }
 
 bytes_from_user :: proc(user: User, arena: mem.Allocator) -> []byte
 {
-  result := make([]byte, 128, arena)
+  result := make([]byte, MAX_USER_SIZE, arena)
   result_pos: int
 
   id_bytes := transmute([size_of(user.id)]byte) user.id
@@ -61,11 +66,17 @@ user_from_bytes :: proc(bytes: []byte, arena: mem.Allocator) -> User
   return result
 }
 
+
+// Message ///////////////////////////////////////////////////////////////////////////////
+
+
 Message :: struct #packed
 {
   sender: UserID,
   data: string,
 }
+
+MAX_MESSAGE_SIZE :: 128
 
 bytes_from_message :: proc(message: Message, arena: mem.Allocator) -> []byte
 {
@@ -96,6 +107,10 @@ message_from_bytes :: proc(bytes: []byte, arena: mem.Allocator) -> Message
 
   return result
 }
+
+
+// Util //////////////////////////////////////////////////////////////////////////////////
+
 
 u8_from_bytes :: proc(bytes: []byte) -> u8
 {
