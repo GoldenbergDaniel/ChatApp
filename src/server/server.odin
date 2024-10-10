@@ -2,6 +2,7 @@ package server
 
 import "core:fmt"
 import "core:net"
+import "core:sync"
 import "core:time"
 import "core:thread"
 import "core:math/rand"
@@ -13,7 +14,7 @@ MAX_CLIENT_CONNECTIONS :: 10
 RECV_TIMEOUT_DURATION  :: time.Millisecond * 100
 
 server_socket: net.TCP_Socket
-clients: ClientStore
+client_store: ClientStore
 connection_thread: ^thread.Thread
 
 main :: proc()
@@ -22,6 +23,7 @@ main :: proc()
   endpoint.address, _ = net.parse_ip4_address("127.0.0.1")
   endpoint.port = 3030
 
+  // --- Start server ---------------
   listen_err: net.Network_Error
   server_socket, listen_err = net.listen_tcp(endpoint, MAX_CLIENT_CONNECTIONS)
   if listen_err != nil
@@ -37,11 +39,11 @@ main :: proc()
   
   for is_running := true; is_running;
   {
-    for client in clients.data[:clients.count]
+    for client in client_store.data[:client_store.count]
     {
       if !client_is_valid(client) do continue
       
-      // Listen for message ----------------
+      // --- Listen for message ---------------
       message_bytes: [common.MAX_MESSAGE_SIZE]byte
       bytes_read, recv_err := net.recv_tcp(client.socket, message_bytes[:])
       if recv_err != nil
@@ -58,13 +60,13 @@ main :: proc()
         }
       }
       
-      // Client disconnected ----------------
+      // --- Client disconnected ---------------
       if bytes_read == 0
       {
         term.color(.GRAY)
         fmt.printf("%s has left the chat. (%i/%i)\n", 
                     client.user.name,
-                    clients.count-1, 
+                    client_store.count-1, 
                     MAX_CLIENT_CONNECTIONS)
         term.color(.WHITE)
 
@@ -72,7 +74,7 @@ main :: proc()
         continue
       }
 
-      // Handle message ----------------
+      // --- Handle message ---------------
       message := common.message_from_bytes(message_bytes[:bytes_read], context.allocator)
       if message.data == "q!"
       {
@@ -88,8 +90,6 @@ main :: proc()
         fmt.printf(": %s\n", message.data)
       }
     }
-
-    // time.sleep(time.Millisecond * 100)
   }
 
   thread.join(connection_thread)
@@ -98,12 +98,14 @@ main :: proc()
 
 connection_thread_proc :: proc(this: ^thread.Thread)
 {
-  for true
+  for
   {
-    if clients.count == MAX_CLIENT_CONNECTIONS do continue
+    time.sleep(time.Millisecond * 100)
+
+    if client_store.count == MAX_CLIENT_CONNECTIONS do continue
 
     client_socket, _, _ := net.accept_tcp(server_socket)
-    if clients.count < MAX_CLIENT_CONNECTIONS
+    if client_store.count < MAX_CLIENT_CONNECTIONS
     {
       user_bytes: [common.MAX_USER_SIZE]byte
       bytes_read, recv_err := net.recv_tcp(client_socket, user_bytes[:])
@@ -119,12 +121,10 @@ connection_thread_proc :: proc(this: ^thread.Thread)
       term.color(.GRAY)
       fmt.printf("%s has entered the chat. (%i/%i)\n", 
                   user.name,
-                  clients.count, 
+                  client_store.count, 
                   MAX_CLIENT_CONNECTIONS)
       term.color(.WHITE)
     }
-
-    // time.sleep(time.Millisecond * 100)
   }
 }
 
@@ -142,6 +142,7 @@ ClientStore :: struct
 {
   data: [MAX_CLIENT_CONNECTIONS]Client,
   count: int,
+  lock: sync.Mutex
 }
 
 client_is_valid :: proc(client: Client) -> bool
@@ -151,32 +152,37 @@ client_is_valid :: proc(client: Client) -> bool
 
 push_client :: proc(client: Client)
 {
-  assert(clients.count < MAX_CLIENT_CONNECTIONS)
+  assert(client_store.count < MAX_CLIENT_CONNECTIONS)
 
-  clients.data[clients.count].socket = client.socket
-  clients.data[clients.count].user = client.user
-  clients.count += 1
+  sync.mutex_lock(&client_store.lock)
+  client_store.data[client_store.count].socket = client.socket
+  client_store.data[client_store.count].user = client.user
+  client_store.count += 1
+  sync.mutex_unlock(&client_store.lock)
 }
 
 pop_client :: proc(client: ^Client)
 {
-  assert(clients.count > 0)
+  assert(client_store.count > 0)
 
-  for &other_client in clients.data
+  sync.mutex_lock(&client_store.lock)
+  for &other_client in client_store.data
   {
     if &other_client == client
     {
       other_client = {}
-      clients.count -= 1
+      client_store.count -= 1
     }
   }
+
+  sync.mutex_unlock(&client_store.lock)
 }
 
 get_client_by_id :: proc(id: common.UserID) -> ^Client
 {
   result: ^Client
 
-  for &client in clients.data
+  for &client in client_store.data
   {
     if client.user.id == id
     {

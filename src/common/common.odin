@@ -17,7 +17,7 @@ User :: struct #packed
   name: string,
 }
 
-MAX_USER_SIZE    :: 128
+MAX_USER_SIZE :: 128
 
 bytes_from_user :: proc(user: User, arena: mem.Allocator) -> []byte
 {

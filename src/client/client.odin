@@ -13,7 +13,7 @@ endpoint_str: string = "127.0.0.1:3030"
 
 main :: proc()
 {
-  // Prompt user's name ----------------
+  // --- Prompt user's name ---------------
   fmt.print("Display name: ")
   name_buf: [128]byte
   name_len, read_name_err := os.read(os.stdin, name_buf[:])
@@ -28,8 +28,8 @@ main :: proc()
 
   fmt.println("Client started.")
 
-  // Connect to server ----------------
-  for true
+  // --- Connect to server ---------------
+  for
   {
     defer free_all(context.temp_allocator)
 
@@ -55,9 +55,10 @@ main :: proc()
     }
   }
 
-  // Send messages ----------------
-  for true
+  // --- Client loop ---------------
+  for
   {
+    // --- Promp user for message ---------------
     fmt.print("> ")
     message_buf: [common.MAX_MESSAGE_SIZE]byte
     message_len, read_msg_err := os.read(os.stdin, message_buf[:])
@@ -67,9 +68,13 @@ main :: proc()
       break
     }
 
-    message: common.Message
-    message.sender = user.id
-    message.data = cast(string) message_buf[:message_len-1]
+    message := common.Message{
+      sender = user.id,
+      data = cast(string) message_buf[:message_len-1],
+      
+    }
+
+    // --- Send message ---------------
     message_bytes := common.bytes_from_message(message, context.temp_allocator)
     _, send_err := net.send_tcp(client_socket, message_bytes)
     if send_err != nil
