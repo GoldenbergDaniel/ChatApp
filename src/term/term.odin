@@ -3,9 +3,9 @@ package term
 import "core:fmt"
 
 @(private)
-current_color: ColorKind
+current_color: Color_Kind
 
-ColorKind :: enum
+Color_Kind :: enum
 {
   BLACK,
   BLUE,
@@ -18,7 +18,7 @@ ColorKind :: enum
   YELLOW,
 }
 
-StyleKind :: enum
+Style_Kind :: enum
 {
   NONE,
   BOLD,
@@ -26,7 +26,7 @@ StyleKind :: enum
   UNDERLINE,
 }
 
-CursorMode :: enum
+Cursor_Mode :: enum
 {
   DEFAULT,
   BLINK,
@@ -37,7 +37,7 @@ reset :: proc()
   fmt.print("\u001b[0m")
 }
 
-color :: proc(kind: ColorKind)
+color :: proc(kind: Color_Kind)
 {
   switch kind
   {
@@ -55,7 +55,27 @@ color :: proc(kind: ColorKind)
   current_color = kind
 }
 
-style :: proc(set: bit_set[StyleKind])
+color_as_string :: proc(kind: Color_Kind) -> string
+{
+  result: string
+
+  switch kind
+  {
+  case .BLACK:  result = "\u001b[38;5;16m"
+  case .BLUE:   result = "\u001b[38;5;4m"
+  case .GRAY:   result = "\u001b[38;5;7m"
+  case .GREEN:  result = "\u001b[38;5;2m"
+  case .ORANGE: result = "\u001b[38;5;166m"
+  case .PURPLE: result = "\u001b[38;5;35m"
+  case .RED:    result = "\u001b[38;5;1m"
+  case .WHITE:  result = "\u001b[38;5;15m"
+  case .YELLOW: result = "\u001b[93m"
+  }
+
+  return result
+}
+
+style :: proc(set: bit_set[Style_Kind])
 {
   if .NONE in set
   {
@@ -69,7 +89,7 @@ style :: proc(set: bit_set[StyleKind])
   }
 }
 
-cursor_mode :: proc(mode: CursorMode)
+cursor_mode :: proc(mode: Cursor_Mode)
 {
   switch mode
   {

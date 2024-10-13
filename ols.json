@@ -12,13 +12,13 @@
   "enable_hover": true,
   "enable_snippets": true,
   "verbose": true,
-  "checker_args": "-vet",
+  "checker_args": "",
   "profile": "main",
   "profiles": [
     {
       "name": "main", 
       "checker_path": [
-        "src/server", "src/client", "src/common", "src/term"
+        "src/server", "src/client", "src/common", "src/term", "src/mem", "src/io"
       ]
     }
   ]
