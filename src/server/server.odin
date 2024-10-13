@@ -83,7 +83,7 @@ main :: proc()
 
         for other_client in client_store.data
         {
-          if !client_is_valid(other_client)  do continue
+          if !client_is_valid(other_client) do continue
           if other_client.user.id == client.user.id do continue
 
           _, send_err := net.send_tcp(other_client.socket, packet_bytes)
@@ -218,9 +218,19 @@ client_is_valid :: proc(client: Client) -> bool
 push_client :: proc(client: Client)
 {
   sync.mutex_lock(&client_store.lock)
-  client_store.data[client_store.count].socket = client.socket
-  client_store.data[client_store.count].user = client.user
-  client_store.count += 1
+
+  for other_client, i in client_store.data
+  {
+    if !client_is_valid(other_client) 
+    {
+      client_store.data[i].socket = client.socket
+      client_store.data[i].user = client.user
+      client_store.count += 1
+      fmt.println("Pushed", client.user)
+      break
+    }
+  }
+
   sync.mutex_unlock(&client_store.lock)
 }
 
@@ -229,16 +239,9 @@ pop_client :: proc(client: ^Client)
   if client == nil do return
 
   sync.mutex_lock(&client_store.lock)
-
-  for &other_client in client_store.data
-  {
-    if &other_client == client
-    {
-      other_client = {}
-      client_store.count -= 1
-    }
-  }
-
+  fmt.println("Popped", client.user)
+  client^ = {}
+  client_store.count -= 1
   sync.mutex_unlock(&client_store.lock)
 }
 

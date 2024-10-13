@@ -17,8 +17,6 @@ user: com.User
 endpoint_str: string = "127.0.0.1:3030"
 receive_messages_thread: ^thread.Thread
 
-user_store: User_Store
-
 shutdown: bool
 
 main :: proc()
@@ -60,7 +58,7 @@ main :: proc()
       _, send_err := net.send_tcp(socket, packet_bytes)
       if send_err != nil
       {
-        fmt.eprintln(send_err)
+        fmt.eprintln("Conn error:", send_err)
         continue
       }
       else
@@ -81,24 +79,17 @@ main :: proc()
     defer mem.clear_arena(&temp_arena)
 
     // --- Prompt user for message ---------------
-    // fmt.print("> ")
     message_buf: [com.MAX_MESSAGE_SIZE]byte
-    message_len, read_msg_err := os.read(os.stdin, message_buf[:])
-    if read_msg_err != nil
-    {
-      fmt.eprintln(read_msg_err)
-      break
-    }
-
-    message := com.create_message(user.id, auto_cast message_buf[:message_len-1])
+    message_len, _ := os.read(os.stdin, message_buf[:])
 
     // --- Send message ---------------
+    message := com.create_message(user.id, string(message_buf[:message_len-1]))
     packet := com.create_packet(.MESSAGE_FROM_CLIENT, {message}, nil)
     packet_bytes := com.serialize_packet(&packet, &temp_arena)
     _, send_err := net.send_tcp(socket, packet_bytes)
     if send_err != nil
     {
-      fmt.eprintln(send_err)
+      fmt.eprintln("Send error:", send_err)
       continue
     }
   }
@@ -114,22 +105,19 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
     packet_bytes: [com.MAX_MESSAGE_SIZE]byte
     bytes_read, recv_err := net.recv_tcp(socket, packet_bytes[:])
 
-    if bytes_read == 0
-    {
-      fmt.println("Server disconnected.")
-      shutdown = true
-      break
-    }
-    
     if recv_err != nil
     {
       err, ok := recv_err.(net.TCP_Recv_Error)
       if !(ok && err == .Timeout)
       {
-        continue
+        fmt.eprintln("Recv error:", recv_err)
       }
-
-      fmt.println(recv_err)
+    }
+    else if bytes_read == 0
+    {
+      fmt.println("Server disconnected.")
+      shutdown = true
+      break
     }
     else
     {
@@ -161,12 +149,4 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
       }
     }
   }
-}
-
-// User //////////////////////////////////////////////////////////////////////////////////
-
-User_Store :: struct
-{
-  data: [com.MAX_CLIENT_CONNECTIONS]com.User,
-  count: int,
 }
