@@ -2,12 +2,14 @@ package mem0
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:mem"
 import "core:mem/virtual"
 
 Allocator       :: runtime.Allocator
 Allocator_Error :: runtime.Allocator_Error
 Arena           :: virtual.Arena
 Arena_Temp      :: virtual.Arena_Temp
+Scratch         :: mem.Scratch
 
 KIB :: 1 << 10
 MIB :: 1 << 20
@@ -20,7 +22,6 @@ STATIC_COM_SIZE  :: virtual.DEFAULT_ARENA_STATIC_COMMIT_SIZE
 copy :: #force_inline proc "contextless" (dst, src: rawptr, len: int) -> rawptr
 {
 	intrinsics.mem_copy(dst, src, len)
-
 	return dst
 }
 
@@ -43,14 +44,14 @@ init_arena_buffer :: proc(arena: ^Arena, buffer: []byte) -> Allocator_Error
 }
 
 init_arena_growing :: proc(arena: ^Arena, 
-													 reserved := GROWING_MIN_SIZE) -> Allocator_Error
+                           reserved := GROWING_MIN_SIZE) -> Allocator_Error
 {
 	return virtual.arena_init_growing(arena, uint(reserved))
 }
 
 init_arena_static :: proc(arena: ^Arena, 
-													reserved := STATIC_RES_SIZE,
-													committed := STATIC_COM_SIZE) -> Allocator_Error
+                          reserved := STATIC_RES_SIZE,
+                          committed := STATIC_COM_SIZE) -> Allocator_Error
 {
 	return virtual.arena_init_static(arena, uint(reserved), uint(committed))
 }
@@ -73,4 +74,9 @@ begin_temp :: #force_inline proc(arena: ^Arena) -> Arena_Temp
 end_temp :: #force_inline proc(temp: Arena_Temp)
 {
 	virtual.arena_temp_end(temp)
+}
+
+init_scratch :: proc(scratch: ^Scratch, size: int, arena: ^Arena)
+{
+	mem.scratch_init(scratch, size, allocator(arena))
 }

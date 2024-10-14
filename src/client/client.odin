@@ -6,7 +6,7 @@ import "core:thread"
 import "core:os"
 
 import com "src:common"
-import "src:mem"
+import "src:basic/mem"
 import "src:term"
 
 perm_arena: mem.Arena
@@ -125,17 +125,17 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
       #partial switch packet.kind
       {
       case .CLIENT_CONNECTED:
-        user := packet.users[0]
+        usr := packet.users[0]
 
         term.color(.GRAY)
-        fmt.print(user.name)
+        fmt.print(usr.name)
         fmt.printf(" has entered the chat.\n")
         term.color(.WHITE)
       case .CLIENT_DISCONNECTED:
-        user := packet.users[0]
+        usr := packet.users[0]
 
         term.color(.GRAY)
-        fmt.print(user.name)
+        fmt.print(usr.name)
         fmt.printf(" has left the chat.\n")
         term.color(.WHITE)
       case .MESSAGE_FROM_SERVER:

@@ -10,15 +10,11 @@ Buffer :: struct
   endian: Endian_Kind,
 }
 
-Endian_Kind :: enum
-{
-  BE,
-  LE,
-}
+Endian_Kind :: enum {BE, LE}
 
 create_buffer :: proc(data: []byte, endian_kind: Endian_Kind) -> Buffer
 {
-  return Buffer{data, 0, 0, endian_kind}
+  return {data, 0, 0, endian_kind}
 }
 
 read_byte :: #force_inline proc(buffer: ^Buffer) -> byte

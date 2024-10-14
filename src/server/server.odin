@@ -8,7 +8,7 @@ import "core:time"
 import "core:thread"
 
 import com "src:common"
-import "src:mem"
+import "src:basic/mem"
 import "src:term"
 
 RECV_TIMEOUT_DURATION  :: time.Millisecond * 100

@@ -4,8 +4,8 @@ import "core:fmt"
 import "core:math/rand"
 import "core:strings"
 
-import "src:bytes"
-import "src:mem"
+import "src:basic/bytes"
+import "src:basic/mem"
 import "src:term"
 
 MAX_CLIENT_CONNECTIONS :: 10
