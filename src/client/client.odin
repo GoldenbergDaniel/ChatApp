@@ -10,7 +10,6 @@ import "src:basic/mem"
 import "src:term"
 
 perm_arena: mem.Arena
-temp_arena: mem.Arena
 
 socket: net.TCP_Socket
 user: com.User
@@ -22,10 +21,6 @@ shutdown: bool
 main :: proc()
 {
   mem.init_arena_static(&perm_arena)
-  context.allocator = mem.allocator(&perm_arena)
-
-  mem.init_arena_growing(&temp_arena)
-  context.temp_allocator = mem.allocator(&temp_arena)
 
   // --- Prompt user's name ---------------
   fmt.print("Display name: ")
@@ -42,7 +37,8 @@ main :: proc()
   // --- Connect to server ---------------
   for
   {
-    defer mem.clear_arena(&temp_arena)
+    temp := mem.begin_temp()
+    defer mem.end_temp(temp)
 
     dial_err: net.Network_Error
     socket, dial_err = net.dial_tcp(endpoint_str)
@@ -54,7 +50,7 @@ main :: proc()
     else
     {
       packet := com.create_packet(.CLIENT_CONNECTED, nil, {user})
-      packet_bytes := com.serialize_packet(&packet, &temp_arena)
+      packet_bytes := com.serialize_packet(&packet, temp.arena)
       _, send_err := net.send_tcp(socket, packet_bytes)
       if send_err != nil
       {
@@ -76,7 +72,8 @@ main :: proc()
   // --- Client loop ---------------
   for !shutdown
   {
-    defer mem.clear_arena(&temp_arena)
+    temp := mem.begin_temp()
+    defer mem.end_temp(temp)
 
     // --- Prompt user for message ---------------
     message_buf: [com.MAX_MESSAGE_SIZE]byte
@@ -85,7 +82,7 @@ main :: proc()
     // --- Send message ---------------
     message := com.create_message(user.id, string(message_buf[:message_len-1]))
     packet := com.create_packet(.MESSAGE_FROM_CLIENT, {message}, nil)
-    packet_bytes := com.serialize_packet(&packet, &temp_arena)
+    packet_bytes := com.serialize_packet(&packet, temp.arena)
     _, send_err := net.send_tcp(socket, packet_bytes)
     if send_err != nil
     {

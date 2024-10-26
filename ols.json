@@ -12,7 +12,7 @@
   "enable_hover": true,
   "enable_snippets": true,
   "verbose": true,
-  "checker_args": "-vet",
+  "checker_args": "-vet -vet-cast",
   "profile": "main",
   "profiles": [
     {

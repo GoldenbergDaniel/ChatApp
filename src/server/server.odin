@@ -14,7 +14,6 @@ import "src:term"
 RECV_TIMEOUT_DURATION  :: time.Millisecond * 100
 
 perm_arena: mem.Arena
-temp_arena: mem.Arena
 
 server_socket: net.TCP_Socket
 connection_thread: ^thread.Thread
@@ -25,8 +24,6 @@ message_store: Message_Store
 main :: proc()
 {
   mem.init_arena_static(&perm_arena)
-  mem.init_arena_growing(&temp_arena)
-
   init_message_store(&message_store)
 
   endpoint, _ := net.parse_endpoint("127.0.0.1:3030")
@@ -47,6 +44,9 @@ main :: proc()
   
   for is_running := true; is_running;
   {
+    temp := mem.begin_temp()
+    defer mem.end_temp(temp)
+
     for client in client_store.data
     {
       if !client_is_valid(client) do continue
@@ -79,7 +79,7 @@ main :: proc()
         term.color(.WHITE)
 
         packet := com.create_packet(.CLIENT_DISCONNECTED, nil, {client.user})
-        packet_bytes := com.serialize_packet(&packet, &temp_arena)
+        packet_bytes := com.serialize_packet(&packet, temp.arena)
 
         for other_client in client_store.data
         {
@@ -128,7 +128,7 @@ main :: proc()
           if !client_is_valid(other_client)        do continue
           if other_client.user.id == ret_sender_id do continue
 
-          ret_packet_bytes := com.serialize_packet(&ret_packet, &temp_arena)
+          ret_packet_bytes := com.serialize_packet(&ret_packet, temp.arena)
           _, send_err := net.send_tcp(other_client.socket, ret_packet_bytes)
           if send_err != nil
           {
@@ -142,15 +142,18 @@ main :: proc()
   thread.terminate(connection_thread, 0)
 }
 
-connection_thread_proc :: proc(this: ^thread.Thread)
+connection_thread_proc :: #force_inline proc(this: ^thread.Thread)
 {
+  mem.init_thread_local_arena()
+  
   for
   {
     time.sleep(time.Millisecond * 100)
 
     if client_store.count == com.MAX_CLIENT_CONNECTIONS do continue
 
-    defer mem.clear_arena(&temp_arena)
+    temp := mem.begin_temp()
+    defer mem.end_temp(temp)
 
     if client_store.count < com.MAX_CLIENT_CONNECTIONS
     {
@@ -175,7 +178,7 @@ connection_thread_proc :: proc(this: ^thread.Thread)
       
       user := packet.users[0]
       packet = com.create_packet(.CLIENT_CONNECTED, nil, {user})
-      send_packet_bytes := com.serialize_packet(&packet, &temp_arena)
+      send_packet_bytes := com.serialize_packet(&packet, temp.arena)
 
       for other_client in client_store.data
       {
@@ -219,16 +222,13 @@ push_client :: proc(client: Client)
 {
   sync.mutex_lock(&client_store.lock)
 
-  for other_client, i in client_store.data
+  for other_client, i in client_store.data do if !client_is_valid(other_client) 
   {
-    if !client_is_valid(other_client) 
-    {
-      client_store.data[i].socket = client.socket
-      client_store.data[i].user = client.user
-      client_store.count += 1
-      fmt.println("Pushed", client.user)
-      break
-    }
+    client_store.data[i].socket = client.socket
+    client_store.data[i].user = client.user
+    client_store.count += 1
+    // fmt.println("Pushed", client.user)
+    break
   }
 
   sync.mutex_unlock(&client_store.lock)
@@ -239,7 +239,7 @@ pop_client :: proc(client: ^Client)
   if client == nil do return
 
   sync.mutex_lock(&client_store.lock)
-  fmt.println("Popped", client.user)
+  // fmt.println("Popped", client.user)
   client^ = {}
   client_store.count -= 1
   sync.mutex_unlock(&client_store.lock)
@@ -286,7 +286,7 @@ push_message :: proc(message: com.Message)
     if message_store.free_list[idx] == true
     {
       message_store.data[idx] = message
-      return 
+      return
     }
   }
 
