@@ -20,8 +20,6 @@ shutdown: bool
 
 main :: proc()
 {
-  mem.init_arena_static(&perm_arena)
-
   // --- Prompt user's name ---------------
   fmt.print("Display name: ")
   name_buf: [128]byte
@@ -37,7 +35,7 @@ main :: proc()
   // --- Connect to server ---------------
   for
   {
-    temp := mem.begin_temp()
+    temp := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(temp)
 
     dial_err: net.Network_Error
@@ -72,7 +70,7 @@ main :: proc()
   // --- Client loop ---------------
   for !shutdown
   {
-    temp := mem.begin_temp()
+    temp := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(temp)
 
     // --- Prompt user for message ---------------

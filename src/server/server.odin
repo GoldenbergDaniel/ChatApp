@@ -44,7 +44,7 @@ main :: proc()
   
   for is_running := true; is_running;
   {
-    temp := mem.begin_temp()
+    temp := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(temp)
 
     for client in client_store.data
@@ -144,7 +144,7 @@ main :: proc()
 
 connection_thread_proc :: #force_inline proc(this: ^thread.Thread)
 {
-  mem.init_thread_local_arena()
+  mem.init_scratches()
   
   for
   {
@@ -152,7 +152,7 @@ connection_thread_proc :: #force_inline proc(this: ^thread.Thread)
 
     if client_store.count == com.MAX_CLIENT_CONNECTIONS do continue
 
-    temp := mem.begin_temp()
+    temp := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(temp)
 
     if client_store.count < com.MAX_CLIENT_CONNECTIONS
