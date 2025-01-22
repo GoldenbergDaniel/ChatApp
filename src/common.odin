@@ -1,4 +1,4 @@
-package common
+package main
 
 import "core:fmt"
 import "core:math/rand"
@@ -8,17 +8,15 @@ import "src:basic/bytes"
 import "src:basic/mem"
 import "src:term"
 
-MAX_CLIENT_CONNECTIONS :: 10
-
 // Packet ////////////////////////////////////////////////////////////////////////////////
 
 Packet :: struct
 {
-  kind: Packet_Kind,
+  kind:          Packet_Kind,
   message_count: u32,
-  messages: []Message,
-  user_count: u32,
-  users: []User,
+  messages:      []Message,
+  user_count:    u32,
+  users:         []User,
 }
 
 Packet_Kind :: enum u8
@@ -100,18 +98,16 @@ deserialize_packet :: proc(buf: []byte, arena: ^mem.Arena) -> Packet
   return result
 }
 
-
 // User //////////////////////////////////////////////////////////////////////////////////
-
 
 User_ID :: u32
 
 User :: struct
 {
-  id: User_ID,
-  color: Color_Kind,
+  id:       User_ID,
+  color:    Color_Kind,
   name_len: u32,
-  name: string,
+  name:     string,
 }
 
 MAX_USER_SIZE :: 128
@@ -155,18 +151,59 @@ user_from_bytes :: proc(buf: []byte, arena: ^mem.Arena) -> (User, int)
   return result, buffer.r_pos
 }
 
-
 // Message ///////////////////////////////////////////////////////////////////////////////
 
+MAX_MESSAGE_SIZE :: 128
 
 Message :: struct
 {
   sender_id: User_ID,
-  data_len: u32,
-  data: string,
+  data_len:  u32,
+  data:      string,
 }
 
-MAX_MESSAGE_SIZE :: 128
+Message_Store :: struct
+{
+  data: [dynamic]Message,
+  free_list: [dynamic]bool,
+  count: int,
+  arena: mem.Arena,
+}
+
+init_message_store :: proc(store: ^Message_Store)
+{
+  mem.init_arena_growing(&store.arena)
+  store.data = make([dynamic]Message, 16, mem.allocator(&store.arena))
+  store.free_list = make([dynamic]bool, 16, mem.allocator(&store.arena))
+}
+
+push_message :: proc(message: Message)
+{
+  for idx in 0..<message_store.count
+  {
+    if message_store.free_list[idx] == true
+    {
+      message_store.data[idx] = message
+      return
+    }
+  }
+
+  assign_at(&message_store.data, message_store.count, message)
+  assign_at(&message_store.free_list, message_store.count, false)
+  message_store.count += 1
+}
+
+pop_message :: proc(idx: int)
+{
+  message_store.data[idx] = {}
+  message_store.free_list[idx] = true
+}
+
+get_message :: proc(idx := -1) -> Message
+{
+  i := idx < 0 ? message_store.count-1 : idx
+  return message_store.data[i]
+}
 
 create_message :: proc(sender_id: User_ID, data: string) -> Message
 {
@@ -205,9 +242,7 @@ message_from_bytes :: proc(buf: []byte, arena: ^mem.Arena) -> (Message, int)
   return result, buffer.r_pos
 }
 
-
 // Util //////////////////////////////////////////////////////////////////////////////////
-
 
 Color_Kind :: enum u8
 {
@@ -222,8 +257,7 @@ color_to_term_color :: proc(color: Color_Kind) -> term.Color_Kind
 {
   result: term.Color_Kind
 
-  switch color
-  {
+  switch color {
   case .BLUE:   result = .BLUE
   case .GREEN:  result = .GREEN
   case .ORANGE: result = .ORANGE

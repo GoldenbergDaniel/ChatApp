@@ -2,6 +2,7 @@ package mem0
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:mem"
 import "core:mem/virtual"
 
 Allocator       :: runtime.Allocator
@@ -40,11 +41,16 @@ zero :: #force_inline proc "contextless" (data: rawptr, len: int) -> rawptr
 	return data
 }
 
+to_bytes :: #force_inline proc "contextless" (val: any) -> []byte
+{
+	return mem.any_to_bytes(val)
+}
+
 allocator :: #force_inline proc "contextless" (arena: ^Arena) -> Allocator
 {
 	return Allocator{
 		procedure = virtual.arena_allocator_proc,
-		data = arena
+		data = arena,
 	}
 }
 
@@ -83,6 +89,12 @@ destroy_arena :: #force_inline proc(arena: ^Arena)
 begin_temp :: #force_inline proc(arena: ^Arena) -> Arena_Temp
 {
 	return virtual.arena_temp_begin(arena)
+}
+
+@(deferred_out=end_temp)
+scope_temp :: #force_inline proc(arena: ^Arena) -> Arena_Temp
+{
+	return begin_temp(arena)
 }
 
 end_temp :: #force_inline proc(temp: Arena_Temp)

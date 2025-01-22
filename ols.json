@@ -18,7 +18,7 @@
     {
       "name": "main", 
       "checker_path": [
-        "src/server", "src/client", "src/common", "src/term", "src/mem", "src/io"
+        "src/server", "src", "src/term", "src/basic/mem", "src/basic/bytes"
       ]
     }
   ]

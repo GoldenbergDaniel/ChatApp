@@ -1,4 +1,4 @@
-package server
+package main
 
 import "core:fmt"
 import "core:math/rand"
@@ -7,12 +7,13 @@ import "core:sync"
 import "core:time"
 import "core:thread"
 
-import com "src:common"
 import "src:basic/mem"
 import "src:term"
 
+MAX_CLIENT_CONNECTIONS :: 10
 RECV_TIMEOUT_DURATION  :: time.Millisecond * 100
 
+@(private="file")
 perm_arena: mem.Arena
 
 server_socket: net.TCP_Socket
@@ -21,7 +22,7 @@ connection_thread: ^thread.Thread
 client_store: Client_Store
 message_store: Message_Store
 
-main :: proc()
+server_entry :: proc()
 {
   mem.init_arena_static(&perm_arena)
   init_message_store(&message_store)
@@ -30,7 +31,7 @@ main :: proc()
 
   // --- Start server ---------------
   listen_err: net.Network_Error
-  server_socket, listen_err = net.listen_tcp(endpoint, com.MAX_CLIENT_CONNECTIONS)
+  server_socket, listen_err = net.listen_tcp(endpoint, MAX_CLIENT_CONNECTIONS)
   if listen_err != nil
   {
     fmt.eprintln("Error creating, binding, or listening.", listen_err)
@@ -52,7 +53,7 @@ main :: proc()
       if !client_is_valid(client) do continue
       
       // --- Listen for messages ---------------
-      packet_bytes: [com.MAX_MESSAGE_SIZE]byte
+      packet_bytes: [MAX_MESSAGE_SIZE]byte
       bytes_read, recv_err := net.recv_tcp(client.socket, packet_bytes[:])
       if recv_err != nil
       {
@@ -75,11 +76,11 @@ main :: proc()
         fmt.printf("%s has left the chat. (%i/%i)\n", 
                     client.user.name,
                     client_store.count-1, 
-                    com.MAX_CLIENT_CONNECTIONS)
+                    MAX_CLIENT_CONNECTIONS)
         term.color(.WHITE)
 
-        packet := com.create_packet(.CLIENT_DISCONNECTED, nil, {client.user})
-        packet_bytes := com.serialize_packet(&packet, temp.arena)
+        packet := create_packet(.CLIENT_DISCONNECTED, nil, {client.user})
+        packet_bytes := serialize_packet(&packet, temp.arena)
 
         for other_client in client_store.data
         {
@@ -99,7 +100,7 @@ main :: proc()
       }
 
       // --- Handle message ---------------
-      packet := com.deserialize_packet(packet_bytes[:bytes_read], &perm_arena)
+      packet := deserialize_packet(packet_bytes[:bytes_read], &perm_arena)
       message := packet.messages[0]
       push_message(message)
 
@@ -120,7 +121,7 @@ main :: proc()
         // --- Send message ---------------
         for other_client in client_store.data
         {
-          ret_packet := com.create_packet(.MESSAGE_FROM_SERVER,
+          ret_packet := create_packet(.MESSAGE_FROM_SERVER,
                                           {message_store.data[message_store.count-1]}, 
                                           {get_client_by_id(sender.user.id).user})
           ret_sender_id := ret_packet.messages[0].sender_id
@@ -128,7 +129,7 @@ main :: proc()
           if !client_is_valid(other_client)        do continue
           if other_client.user.id == ret_sender_id do continue
 
-          ret_packet_bytes := com.serialize_packet(&ret_packet, temp.arena)
+          ret_packet_bytes := serialize_packet(&ret_packet, temp.arena)
           _, send_err := net.send_tcp(other_client.socket, ret_packet_bytes)
           if send_err != nil
           {
@@ -150,35 +151,35 @@ connection_thread_proc :: #force_inline proc(this: ^thread.Thread)
   {
     time.sleep(time.Millisecond * 100)
 
-    if client_store.count == com.MAX_CLIENT_CONNECTIONS do continue
+    if client_store.count == MAX_CLIENT_CONNECTIONS do continue
 
     temp := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(temp)
 
-    if client_store.count < com.MAX_CLIENT_CONNECTIONS
+    if client_store.count < MAX_CLIENT_CONNECTIONS
     {
       client_socket, _, _ := net.accept_tcp(server_socket)
 
-      recv_packet_bytes: [com.MAX_USER_SIZE]byte
+      recv_packet_bytes: [MAX_USER_SIZE]byte
       bytes_read, recv_err := net.recv_tcp(client_socket, recv_packet_bytes[:])
       if recv_err != nil || bytes_read == 0 do break
 
       net.set_option(client_socket, .Receive_Timeout, RECV_TIMEOUT_DURATION)
 
-      packet := com.deserialize_packet(recv_packet_bytes[:], &perm_arena)
-      packet.users[0].color = rand.choice_enum(com.Color_Kind)
+      packet := deserialize_packet(recv_packet_bytes[:], &perm_arena)
+      packet.users[0].color = rand.choice_enum(Color_Kind)
       push_client(Client{client_socket, packet.users[0]})
 
       term.color(.GRAY)
       fmt.printf("%s has entered the chat. (%i/%i)\n", 
                   packet.users[0].name,
                   client_store.count, 
-                  com.MAX_CLIENT_CONNECTIONS)
+                  MAX_CLIENT_CONNECTIONS)
       term.color(.WHITE)
       
       user := packet.users[0]
-      packet = com.create_packet(.CLIENT_CONNECTED, nil, {user})
-      send_packet_bytes := com.serialize_packet(&packet, temp.arena)
+      packet = create_packet(.CLIENT_CONNECTED, nil, {user})
+      send_packet_bytes := serialize_packet(&packet, temp.arena)
 
       for other_client in client_store.data
       {
@@ -196,19 +197,15 @@ connection_thread_proc :: #force_inline proc(this: ^thread.Thread)
   }
 }
 
-
-// @Clients //////////////////////////////////////////////////////////////////////////////
-
-
 Client :: struct
 {
   socket: net.TCP_Socket,
-  user: com.User,
+  user: User,
 }
 
 Client_Store :: struct
 {
-  data: [com.MAX_CLIENT_CONNECTIONS]Client,
+  data: [MAX_CLIENT_CONNECTIONS]Client,
   count: int,
   lock: sync.Mutex
 }
@@ -245,7 +242,7 @@ pop_client :: proc(client: ^Client)
   sync.mutex_unlock(&client_store.lock)
 }
 
-get_client_by_id :: proc(id: com.User_ID) -> ^Client
+get_client_by_id :: proc(id: User_ID) -> ^Client
 {
   result: ^Client
   for &client in client_store.data
@@ -260,49 +257,4 @@ get_client_by_id :: proc(id: com.User_ID) -> ^Client
   }
 
   return result
-}
-
-// Messages //////////////////////////////////////////////////////////////////////////////
-
-Message_Store :: struct
-{
-  data: [dynamic]com.Message,
-  free_list: [dynamic]bool,
-  count: int,
-  arena: mem.Arena,
-}
-
-init_message_store :: proc(store: ^Message_Store)
-{
-  mem.init_arena_growing(&store.arena)
-  store.data = make([dynamic]com.Message, 16, mem.allocator(&store.arena))
-  store.free_list = make([dynamic]bool, 16, mem.allocator(&store.arena))
-}
-
-push_message :: proc(message: com.Message)
-{
-  for idx in 0..<message_store.count
-  {
-    if message_store.free_list[idx] == true
-    {
-      message_store.data[idx] = message
-      return
-    }
-  }
-
-  assign_at(&message_store.data, message_store.count, message)
-  assign_at(&message_store.free_list, message_store.count, false)
-  message_store.count += 1
-}
-
-pop_message :: proc(idx: int)
-{
-  message_store.data[idx] = {}
-  message_store.free_list[idx] = true
-}
-
-get_message :: proc(idx := -1) -> com.Message
-{
-  i := idx < 0 ? message_store.count-1 : idx
-  return message_store.data[i]
 }

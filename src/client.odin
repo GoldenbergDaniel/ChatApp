@@ -1,24 +1,24 @@
-package client
+package main
 
 import "core:fmt"
 import "core:net"
 import "core:thread"
 import "core:os"
 
-import com "src:common"
 import "src:basic/mem"
 import "src:term"
 
+@(private="file")
 perm_arena: mem.Arena
 
 socket: net.TCP_Socket
-user: com.User
+user: User
 endpoint_str: string = "127.0.0.1:3030"
 receive_messages_thread: ^thread.Thread
 
 shutdown: bool
 
-main :: proc()
+client_entry :: proc()
 {
   // --- Prompt user's name ---------------
   fmt.print("Display name: ")
@@ -30,7 +30,7 @@ main :: proc()
     return
   }
 
-  user = com.create_user(string(name_buf[:name_len-1]))
+  user = create_user(string(name_buf[:name_len-1]))
 
   // --- Connect to server ---------------
   for
@@ -47,8 +47,8 @@ main :: proc()
     }
     else
     {
-      packet := com.create_packet(.CLIENT_CONNECTED, nil, {user})
-      packet_bytes := com.serialize_packet(&packet, temp.arena)
+      packet := create_packet(.CLIENT_CONNECTED, nil, {user})
+      packet_bytes := serialize_packet(&packet, temp.arena)
       _, send_err := net.send_tcp(socket, packet_bytes)
       if send_err != nil
       {
@@ -74,13 +74,13 @@ main :: proc()
     defer mem.end_temp(temp)
 
     // --- Prompt user for message ---------------
-    message_buf: [com.MAX_MESSAGE_SIZE]byte
+    message_buf: [MAX_MESSAGE_SIZE]byte
     message_len, _ := os.read(os.stdin, message_buf[:])
 
     // --- Send message ---------------
-    message := com.create_message(user.id, string(message_buf[:message_len-1]))
-    packet := com.create_packet(.MESSAGE_FROM_CLIENT, {message}, nil)
-    packet_bytes := com.serialize_packet(&packet, temp.arena)
+    message := create_message(user.id, string(message_buf[:message_len-1]))
+    packet := create_packet(.MESSAGE_FROM_CLIENT, {message}, nil)
+    packet_bytes := serialize_packet(&packet, temp.arena)
     _, send_err := net.send_tcp(socket, packet_bytes)
     if send_err != nil
     {
@@ -97,7 +97,7 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
   for
   {
     // --- Listen for message ---------------
-    packet_bytes: [com.MAX_MESSAGE_SIZE]byte
+    packet_bytes: [MAX_MESSAGE_SIZE]byte
     bytes_read, recv_err := net.recv_tcp(socket, packet_bytes[:])
 
     if recv_err != nil
@@ -116,7 +116,7 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
     }
     else
     {
-      packet := com.deserialize_packet(packet_bytes[:bytes_read], &perm_arena)
+      packet := deserialize_packet(packet_bytes[:bytes_read], &perm_arena)
       #partial switch packet.kind
       {
       case .CLIENT_CONNECTED:
@@ -137,7 +137,7 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
         message := packet.messages[0]
         sender := packet.users[0]
 
-        term.color(com.color_to_term_color(sender.color))
+        term.color(color_to_term_color(sender.color))
         fmt.print(sender.name)
         term.color(.WHITE)
         fmt.printf(": %s\n", message.data)
