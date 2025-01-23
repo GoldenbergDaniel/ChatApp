@@ -100,7 +100,7 @@ deserialize_packet :: proc(buf: []byte, arena: ^mem.Arena) -> Packet
 
 // User //////////////////////////////////////////////////////////////////////////////////
 
-User_ID :: u32
+User_ID :: distinct u32
 
 User :: struct
 {
@@ -115,7 +115,7 @@ MAX_USER_SIZE :: 128
 create_user :: proc(name: string, color: Color_Kind = .BLUE) -> User
 {
   result: User
-  result.id = rand.uint32()
+  result.id = cast(User_ID) rand.uint32()
   result.name_len = cast(u32) len(name)
   result.name = name
 
@@ -128,8 +128,8 @@ bytes_from_user :: proc(user: User, arena: ^mem.Arena) -> []byte
   result := make([]byte, MAX_USER_SIZE, mem.allocator(arena))
 
   buffer := bytes.create_buffer(result, .BE)
-  bytes.write_u32(&buffer, user.id)
-  bytes.write_u8(&buffer, cast(u8) user.color)
+  bytes.write_u32(&buffer, u32(user.id))
+  bytes.write_u8(&buffer, u8(user.color))
   bytes.write_u32(&buffer, user.name_len)
   bytes.write_bytes(&buffer, transmute([]byte) user.name[:user.name_len])
 
@@ -142,7 +142,7 @@ user_from_bytes :: proc(buf: []byte, arena: ^mem.Arena) -> (User, int)
   result: User
 
   buffer := bytes.create_buffer(buf, .BE)
-  result.id = bytes.read_u32(&buffer)
+  result.id = cast(User_ID) bytes.read_u32(&buffer)
   result.color = cast(Color_Kind) bytes.read_u8(&buffer)
   result.name_len = bytes.read_u32(&buffer)
   result.name = cast(string) bytes.read_bytes(&buffer, int(result.name_len))
@@ -164,10 +164,10 @@ Message :: struct
 
 Message_Store :: struct
 {
-  data: [dynamic]Message,
+  data:      [dynamic]Message,
   free_list: [dynamic]bool,
-  count: int,
-  arena: mem.Arena,
+  count:     int,
+  arena:     mem.Arena,
 }
 
 init_message_store :: proc(store: ^Message_Store)
@@ -221,7 +221,7 @@ bytes_from_message :: proc(message: Message, arena: ^mem.Arena) -> []byte
   result := make([]byte, MAX_MESSAGE_SIZE, mem.allocator(arena))
 
   buffer := bytes.create_buffer(result, .BE)
-  bytes.write_u32(&buffer, message.sender_id)
+  bytes.write_u32(&buffer, u32(message.sender_id))
   bytes.write_u32(&buffer, message.data_len)
   bytes.write_bytes(&buffer, transmute([]byte) message.data[:message.data_len])
 
@@ -234,7 +234,7 @@ message_from_bytes :: proc(buf: []byte, arena: ^mem.Arena) -> (Message, int)
   result: Message
 
   buffer := bytes.create_buffer(buf, .BE)
-  result.sender_id = bytes.read_u32(&buffer)
+  result.sender_id = cast(User_ID) bytes.read_u32(&buffer)
   result.data_len = bytes.read_u32(&buffer)
   result.data = cast(string) bytes.read_bytes(&buffer, int(result.data_len))
   result.data = strings.clone(result.data, mem.allocator(arena))

@@ -13,14 +13,13 @@ perm_arena: mem.Arena
 
 socket: net.TCP_Socket
 user: User
-endpoint_str: string = "127.0.0.1:3030"
 receive_messages_thread: ^thread.Thread
-
 shutdown: bool
+connected: bool
 
 client_entry :: proc()
 {
-  // --- Prompt user's name ---------------
+  // - Prompt user's name ---
   fmt.print("Display name: ")
   name_buf: [128]byte
   name_len, read_name_err := os.read(os.stdin, name_buf[:])
@@ -32,52 +31,23 @@ client_entry :: proc()
 
   user = create_user(string(name_buf[:name_len-1]))
 
-  // --- Connect to server ---------------
-  for
-  {
-    temp := mem.begin_temp(mem.get_scratch())
-    defer mem.end_temp(temp)
-
-    dial_err: net.Network_Error
-    socket, dial_err = net.dial_tcp(endpoint_str)
-    if dial_err != nil
-    {
-      net.close(socket)
-      continue
-    }
-    else
-    {
-      packet := create_packet(.CLIENT_CONNECTED, nil, {user})
-      packet_bytes := serialize_packet(&packet, temp.arena)
-      _, send_err := net.send_tcp(socket, packet_bytes)
-      if send_err != nil
-      {
-        fmt.eprintln("Conn error:", send_err)
-        continue
-      }
-      else
-      {
-        fmt.println("Connected to server on", endpoint_str)
-
-        receive_messages_thread = thread.create(recieve_messages_thread_proc)
-        thread.start(receive_messages_thread)
-      }
-
-      break
-    }
-  }
-
-  // --- Client loop ---------------
+  // - Client loop ---
   for !shutdown
   {
     temp := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(temp)
 
-    // --- Prompt user for message ---------------
+    if !connected
+    {
+      try_connect_to_server()
+    }
+
+    // - Prompt user for message ---
     message_buf: [MAX_MESSAGE_SIZE]byte
     message_len, _ := os.read(os.stdin, message_buf[:])
+    if message_len <= 0 do continue
 
-    // --- Send message ---------------
+    // - Send message ---
     message := create_message(user.id, string(message_buf[:message_len-1]))
     packet := create_packet(.MESSAGE_FROM_CLIENT, {message}, nil)
     packet_bytes := serialize_packet(&packet, temp.arena)
@@ -96,7 +66,7 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
 {
   for
   {
-    // --- Listen for message ---------------
+    // - Listen for message ---
     packet_bytes: [MAX_MESSAGE_SIZE]byte
     bytes_read, recv_err := net.recv_tcp(socket, packet_bytes[:])
 
@@ -111,7 +81,7 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
     else if bytes_read == 0
     {
       fmt.println("Server disconnected.")
-      shutdown = true
+      connected = false
       break
     }
     else
@@ -142,6 +112,38 @@ recieve_messages_thread_proc :: proc(this: ^thread.Thread)
         term.color(.WHITE)
         fmt.printf(": %s\n", message.data)
       }
+    }
+  }
+}
+
+try_connect_to_server :: proc()
+{
+  temp := mem.begin_temp(mem.get_scratch())
+  defer mem.end_temp(temp)
+
+  dial_err: net.Network_Error
+  socket, dial_err = net.dial_tcp(ENDPOINT)
+  if dial_err != nil
+  {
+    net.close(socket)
+    return
+  }
+  else
+  {
+    packet := create_packet(.CLIENT_CONNECTED, nil, {user})
+    packet_bytes := serialize_packet(&packet, temp.arena)
+    _, send_err := net.send_tcp(socket, packet_bytes)
+    if send_err != nil
+    {
+      fmt.eprintln("Connection error:", send_err)
+      return
+    }
+    else
+    {
+      fmt.println("Connected to server on", ENDPOINT)
+      connected = true
+      receive_messages_thread = thread.create(recieve_messages_thread_proc)
+      thread.start(receive_messages_thread)
     }
   }
 }

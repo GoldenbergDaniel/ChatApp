@@ -27,7 +27,7 @@ server_entry :: proc()
   mem.init_arena_static(&perm_arena)
   init_message_store(&message_store)
 
-  endpoint, _ := net.parse_endpoint("127.0.0.1:3030")
+  endpoint, _ := net.parse_endpoint(ENDPOINT)
 
   // --- Start server ---------------
   listen_err: net.Network_Error
@@ -224,7 +224,8 @@ push_client :: proc(client: Client)
     client_store.data[i].socket = client.socket
     client_store.data[i].user = client.user
     client_store.count += 1
-    // fmt.println("Pushed", client.user)
+    
+    fmt.println("Pushed client of ID", client.user.id)
     break
   }
 
@@ -236,10 +237,11 @@ pop_client :: proc(client: ^Client)
   if client == nil do return
 
   sync.mutex_lock(&client_store.lock)
-  // fmt.println("Popped", client.user)
   client^ = {}
   client_store.count -= 1
   sync.mutex_unlock(&client_store.lock)
+  
+  fmt.println("Popped client of ID", client.user.id)
 }
 
 get_client_by_id :: proc(id: User_ID) -> ^Client
